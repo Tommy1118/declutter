@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>家庭斷捨離大作戰 - Swipe & Declutter</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap">
+    
+    <script>
+        // =========================================================================
+        // ⚙️ 管理員設定：請將您的 Google Web App 網址貼在下面的雙引號內
+        // 例如: "https://script.google.com/macros/s/AKfycbxxxxx/exec"
+        // =========================================================================
+        const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqcznvSWMSlS_76qQSCJ3Xz4e6sOBqtEUwBZ9tC6xD_TbBzKunfmiDiH130lslRInp/exec";
+    </script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+            background-color: #f3f4f6;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .card-stack {
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+            height: 470px;
+        }
+
+        .swipe-card {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            background: white;
+            cursor: grab;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
+            will-change: transform, opacity;
+            touch-action: none;
+        }
+
+        .swipe-card:active {
+            cursor: grabbing;
+        }
+
+        .badge-stamp {
+            position: absolute;
+            padding: 0.35rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border: 4px solid;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 10;
+        }
+
+        .badge-keep {
+            top: 2rem;
+            left: 2rem;
+            color: #10B981;
+            border-color: #10B981;
+            transform: rotate(-15deg);
+            background-color: rgba(255, 255, 255, 0.85);
+        }
+
+        .badge-discard {
+            top: 2rem;
+            right: 2rem;
+            color: #EF4444;
+            border-color: #EF4444;
+            transform: rotate(15deg);
+            background-color: rgba(255, 255, 255, 0.85);
+        }
+
+        .badge-undecided {
+            bottom: 6.5rem;
+            left: 50%;
+            transform: translateX(-50%) rotate(0deg);
+            color: #D97706;
+            border-color: #F59E0B;
+            background-color: rgba(255, 255, 255, 0.9);
+            white-space: nowrap;
+        }
+
+        .card-stack .swipe-card:nth-last-child(1) {
+            z-index: 3;
+            transform: scale(1) translateY(0);
+        }
+        .card-stack .swipe-card:nth-last-child(2) {
+            z-index: 2;
+            transform: scale(0.95) translateY(16px);
+            opacity: 0.9;
+            pointer-events: none;
+        }
+        .card-stack .swipe-card:nth-last-child(3) {
+            z-index: 1;
+            transform: scale(0.9) translateY(32px);
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        .card-stack .swipe-card:nth-last-child(n+4) {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col justify-between items-center overflow-x-hidden">
+
+    <header class="w-full max-w-md bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-40 shadow-sm flex items-center justify-between no-print">
+        <div class="flex items-center space-x-2">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white text-lg shadow-md shadow-emerald-100">
+                <i class="fa-solid fa-broom"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-slate-800 text-base leading-tight">斷捨離助手</h1>
+                <p class="text-[11px] text-slate-500">家庭整理・快樂揀選</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+            <button id="add-item-btn" onclick="openAddModal()" class="flex items-center space-x-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition">
+                <i class="fa-solid fa-plus"></i>
+                <span>新增項目</span>
+            </button>
+            <button id="summary-toggle-btn" onclick="switchView('summary')" class="relative p-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition">
+                <i class="fa-solid fa-chart-pie text-lg"></i>
+                <span id="badge-total-count" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+            </button>
+        </div>
+    </header>
+
+    <main id="swipe-view" class="w-full max-w-md flex-1 flex flex-col items-center justify-between p-4 no-print">
+        <div class="w-full overflow-x-auto pb-2 flex space-x-2 no-scrollbar scroll-smooth">
+            <button onclick="filterCategory('ALL')" class="category-btn active px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-slate-800 text-white shadow-sm transition">
+                <i class="fa-solid fa-border-all mr-1"></i> 全部
+            </button>
+            <button onclick="filterCategory('客廳')" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm transition">
+                🛋️ 客廳
+            </button>
+            <button onclick="filterCategory('臥室')" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm transition">
+                🛏️ 臥室
+            </button>
+            <button onclick="filterCategory('廚房')" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm transition">
+                🍳 廚房
+            </button>
+            <button onclick="filterCategory('書房')" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm transition">
+                📚 書房
+            </button>
+            <button onclick="filterCategory('陽台與雜物')" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm transition">
+                📦 陽台雜物
+            </button>
+        </div>
+
+        <div class="w-full my-1.5">
+            <div class="flex justify-between text-xs text-slate-500 font-medium mb-1">
+                <span id="progress-text">剩餘卡片: 0張</span>
+                <span id="progress-percent">0% 完成</span>
+            </div>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                <div id="progress-bar-fill" class="bg-gradient-to-r from-teal-400 to-emerald-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+        </div>
+
+        <div class="my-auto py-2 flex items-center justify-center w-full">
+            <div id="card-stack" class="card-stack flex items-center justify-center">
+                <div id="empty-state" class="hidden flex flex-col items-center justify-center text-center p-6 bg-white rounded-3xl border-2 border-dashed border-slate-200 h-full w-full shadow-inner">
+                    <div class="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center text-3xl mb-4 animate-bounce">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-800 text-lg mb-1">太棒了！該類別物品已全數決定完畢</h3>
+                    <p class="text-xs text-slate-500 mb-6 max-w-[220px]">您可以切換至其他區域分類，或查看斷捨離總成果。</p>
+                    <div class="flex flex-col space-y-2 w-full max-w-[200px]">
+                        <button onclick="switchView('summary')" class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow-md transition">
+                            查看斷捨離總清單
+                        </button>
+                        <button onclick="resetSwipes()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition">
+                            重新開始篩選
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full flex items-center justify-between space-x-2 py-2 px-1">
+            <button id="undo-btn" onclick="undoLastSwipe()" disabled title="復原上一次操作" class="w-10 h-12 rounded-2xl bg-white text-slate-500 border border-slate-200 shadow-sm flex flex-col items-center justify-center text-xs disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 active:scale-95 transition">
+                <i class="fa-solid fa-rotate-left text-sm mb-0.5"></i>
+                <span class="text-[10px] font-medium">復原</span>
+            </button>
+            <button onclick="triggerSwipe('left')" title="保留 (往左滑)" class="flex-1 h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-100 flex items-center justify-center space-x-1.5 active:scale-95 transition transform">
+                <i class="fa-solid fa-heart text-base"></i>
+                <span class="font-bold text-sm">保留</span>
+            </button>
+            <button onclick="triggerSwipe('up')" title="沒意見/考慮中 (往上滑)" class="flex-1 h-12 rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-900 shadow-md shadow-amber-100 flex items-center justify-center space-x-1.5 active:scale-95 transition transform">
+                <i class="fa-solid fa-question-circle text-base"></i>
+                <span class="font-bold text-sm">沒意見</span>
+            </button>
+            <button onclick="triggerSwipe('right')" title="丟棄 (往右滑)" class="flex-1 h-12 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-100 flex items-center justify-center space-x-1.5 active:scale-95 transition transform">
+                <i class="fa-solid fa-trash-can text-base"></i>
+                <span class="font-bold text-sm">丟棄</span>
+            </button>
+        </div>
+    </main>
+
+    <main id="summary-view" class="w-full max-w-md flex-1 flex-col p-4 hidden no-print">
+        <div class="flex items-center justify-between mb-4">
+            <button onclick="switchView('swipe')" class="flex items-center space-x-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-xl hover:bg-slate-50 transition shadow-sm">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>返回卡片模式</span>
+            </button>
+            <div class="flex space-x-2">
+                <button onclick="copySummaryText()" class="p-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-medium flex items-center space-x-1 transition shadow-sm">
+                    <i class="fa-regular fa-copy"></i>
+                    <span>複製清單</span>
+                </button>
+                <button onclick="window.print()" class="p-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-medium flex items-center space-x-1 transition shadow-sm">
+                    <i class="fa-solid fa-print"></i>
+                    <span>列印/匯出</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-2 mb-4">
+            <div class="bg-white p-2.5 rounded-2xl border border-slate-100 shadow-sm text-center">
+                <p class="text-[10px] text-slate-400 font-medium">總項目</p>
+                <p id="stat-total" class="text-lg font-extrabold text-slate-800 mt-0.5">0</p>
+            </div>
+            <div class="bg-emerald-50/80 border border-emerald-100 p-2.5 rounded-2xl shadow-sm text-center">
+                <p class="text-[10px] text-emerald-600 font-medium">決定保留</p>
+                <p id="stat-keep" class="text-lg font-extrabold text-emerald-600 mt-0.5">0</p>
+            </div>
+            <div class="bg-amber-50/80 border border-amber-100 p-2.5 rounded-2xl shadow-sm text-center">
+                <p class="text-[10px] text-amber-600 font-medium">沒意見/考慮</p>
+                <p id="stat-undecided" class="text-lg font-extrabold text-amber-600 mt-0.5">0</p>
+            </div>
+            <div class="bg-rose-50/80 border border-rose-100 p-2.5 rounded-2xl shadow-sm text-center">
+                <p class="text-[10px] text-rose-500 font-medium">決定丟棄</p>
+                <p id="stat-discard" class="text-lg font-extrabold text-rose-500 mt-0.5">0</p>
+            </div>
+        </div>
+
+        <div class="bg-slate-200 p-1 rounded-xl flex space-x-1 mb-4 text-[11px] font-semibold">
+            <button id="tab-btn-discard" onclick="switchResultTab('discard')" class="flex-1 py-2 rounded-lg bg-white text-rose-600 shadow-sm transition flex items-center justify-center space-x-1">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>丟棄</span>
+                <span id="tab-count-discard" class="ml-0.5 bg-rose-100 text-rose-600 px-1.5 py-0.2 rounded-full text-[9px]">0</span>
+            </button>
+            <button id="tab-btn-undecided" onclick="switchResultTab('undecided')" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-800 transition flex items-center justify-center space-x-1">
+                <i class="fa-solid fa-question"></i>
+                <span>考慮中</span>
+                <span id="tab-count-undecided" class="ml-0.5 bg-amber-100 text-amber-600 px-1.5 py-0.2 rounded-full text-[9px]">0</span>
+            </button>
+            <button id="tab-btn-keep" onclick="switchResultTab('keep')" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-800 transition flex items-center justify-center space-x-1">
+                <i class="fa-solid fa-box-archive"></i>
+                <span>保留</span>
+                <span id="tab-count-keep" class="ml-0.5 bg-slate-300 text-slate-600 px-1.5 py-0.2 rounded-full text-[9px]">0</span>
+            </button>
+        </div>
+
+        <div id="result-items-container" class="space-y-2.5 overflow-y-auto max-h-[calc(100vh-360px)] pr-1 mb-4"></div>
+
+        <!-- Google Sheets Cloud Sync Section -->
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-4 rounded-2xl shadow-lg mt-auto">
+            <div class="flex items-center space-x-2 mb-2">
+                <i class="fa-solid fa-cloud-arrow-up text-emerald-400 text-lg"></i>
+                <h3 class="font-bold text-sm">提交個人選擇結果 (雲端彙整)</h3>
+            </div>
+            <p class="text-[11px] text-slate-300 mb-3">輸入您的稱呼，按下送出即可將成果私密提交至家長彙整表單。</p>
+            
+            <div class="space-y-2.5">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">您的稱呼 / 姓名：</label>
+                    <input type="text" id="user-name-input" placeholder="例如：爸爸、小明" class="w-full px-3 py-2 bg-slate-700/60 border border-slate-600 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400">
+                </div>
+
+                <div id="custom-url-field" class="hidden">
+                    <label class="block text-[10px] text-slate-400 mb-1">Google Web App URL：</label>
+                    <input type="text" id="script-url-input" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 bg-slate-700/60 border border-slate-600 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400">
+                </div>
+
+                <button onclick="uploadToGoogleSheets()" id="upload-btn" class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>送出我的成果至 Google 試算表</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Keep Reason Modal -->
+    <div id="keep-reason-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl transform transition-all p-5">
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-xl mb-3">
+                <i class="fa-solid fa-pen-nib"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 text-base mb-1">請填寫「保留理由」</h3>
+            <p class="text-xs text-slate-500 mb-4">這件物品對您有什麼特別價值？沒理由的話就必須丟棄囉！</p>
+            
+            <form onsubmit="confirmKeepReason(event)" class="space-y-3">
+                <div>
+                    <textarea id="keep-reason-input" rows="3" required placeholder="例如：具有紀念意義、最近一週內有用到、獨一無二無法替代..." class="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"></textarea>
+                </div>
+                
+                <div class="flex flex-wrap gap-1.5 mb-2">
+                    <button type="button" onclick="setQuickReason('近一週內有常用到')" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-200">常用到</button>
+                    <button type="button" onclick="setQuickReason('珍貴回憶紀念物品')" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-200">珍貴紀念</button>
+                    <button type="button" onclick="setQuickReason('市面上買不到的稀有品')" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-200">絕版稀有</button>
+                </div>
+
+                <div class="flex flex-col space-y-2 pt-1">
+                    <button type="submit" class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl text-xs shadow-md transition">
+                        確認保留 (填寫完畢)
+                    </button>
+                    <button type="button" onclick="forceDiscardFromModal()" class="w-full py-2.5 bg-slate-100 hover:bg-rose-50 text-rose-600 font-semibold rounded-xl text-xs transition">
+                        想不出理由，改為丟棄
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div id="add-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl transform transition-all">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="font-bold text-slate-800 text-base">新增家裡要篩選的物品</h3>
+                <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="add-item-form" onsubmit="handleAddItem(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">照片上傳 / 拍攝</label>
+                    <div id="image-upload-area" onclick="document.getElementById('item-image-input').click()" class="border-2 border-dashed border-slate-200 hover:border-emerald-400 bg-slate-50 rounded-2xl h-36 flex flex-col items-center justify-center cursor-pointer transition overflow-hidden relative">
+                        <img id="image-preview" class="w-full h-full object-cover hidden" alt="Preview">
+                        <div id="upload-placeholder" class="text-center p-3">
+                            <i class="fa-solid fa-camera text-2xl text-slate-400 mb-1"></i>
+                            <p class="text-xs text-slate-500 font-medium">點擊選擇照片或拍照</p>
+                        </div>
+                    </div>
+                    <input type="file" id="item-image-input" accept="image/*" class="hidden" onchange="previewImage(event)">
+                </div>
+
+                <div>
+                    <label for="item-name" class="block text-xs font-semibold text-slate-600 mb-1">物品名稱 <span class="text-rose-500">*</span></label>
+                    <input type="text" id="item-name" required placeholder="例如：舊長褲、多餘的馬克杯" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label for="item-category" class="block text-xs font-semibold text-slate-600 mb-1">所屬區域 / 分類</label>
+                    <select id="item-category" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                        <option value="客廳">🛋 客廳</option>
+                        <option value="臥室">🛏️ 臥室</option>
+                        <option value="廚房">🍳 廚房</option>
+                        <option value="書房">📚 書房</option>
+                        <option value="陽台與雜物">📦 陽台與雜物</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="item-notes" class="block text-xs font-semibold text-slate-600 mb-1">備註 / 清理指引 (選填)</label>
+                    <input type="text" id="item-notes" placeholder="例如：拿去回收、問家人要不要" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-xl text-sm shadow-md transition transform active:scale-98 mt-2">
+                    加入斷捨離卡片盒
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Printable Version -->
+    <div class="print-only hidden p-8 bg-white text-slate-900 w-full">
+        <div class="text-center border-b pb-4 mb-6">
+            <h1 class="text-2xl font-bold">家庭斷捨離大作戰 - 執行清單</h1>
+            <p class="text-sm text-slate-500 mt-1">列印時間：<span id="print-date"></span></p>
+        </div>
+        
+        <div class="mb-6">
+            <h2 class="text-lg font-bold text-rose-600 border-b border-rose-200 pb-1 mb-3">🗑️ 待丟棄 / 回收清單</h2>
+            <table class="w-full text-left text-sm border-collapse">
+                <thead>
+                    <tr class="border-b bg-slate-50">
+                        <th class="p-2">物品名稱</th>
+                        <th class="p-2">區域分類</th>
+                        <th class="p-2">備註處理方式</th>
+                        <th class="p-2 w-16 text-center">完成確認</th>
+                    </tr>
+                </thead>
+                <tbody id="print-discard-tbody"></tbody>
+            </table>
+        </div>
+
+        <div class="mb-6">
+            <h2 class="text-lg font-bold text-amber-600 border-b border-amber-200 pb-1 mb-3">🤔 沒意見 / 待家庭討論清單</h2>
+            <table class="w-full text-left text-sm border-collapse">
+                <thead>
+                    <tr class="border-b bg-slate-50">
+                        <th class="p-2">物品名稱</th>
+                        <th class="p-2">區域分類</th>
+                        <th class="p-2">備註說明</th>
+                    </tr>
+                </thead>
+                <tbody id="print-undecided-tbody"></tbody>
+            </table>
+        </div>
+
+        <div>
+            <h2 class="text-lg font-bold text-emerald-600 border-b border-emerald-200 pb-1 mb-3">📦 決定保留清單 (含保留理由)</h2>
+            <table class="w-full text-left text-sm border-collapse">
+                <thead>
+                    <tr class="border-b bg-slate-50">
+                        <th class="p-2">物品名稱</th>
+                        <th class="p-2">區域分類</th>
+                        <th class="p-2">保留理由</th>
+                    </tr>
+                </thead>
+                <tbody id="print-keep-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Notification Toast Message -->
+    <div id="toast" class="fixed bottom-20 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-xl shadow-lg transform translate-y-10 opacity-0 transition-all duration-300 pointer-events-none z-50 flex items-center space-x-2">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-msg">已成功更新</span>
+    </div>
+
+    <script>
+        const INITIAL_ITEMS = [
+            { id: '1', name: '泛黃的舊T恤 (5年老衣)', category: '臥室', notes: '起毛球且領口鬆了，可當抹布或直接丟棄', imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80', status: 'pending', keepReason: '' },
+            { id: '2', name: '過期3個月的罐頭保養品', category: '臥室', notes: '成分可能變質，對皮膚不好', imageUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=600&q=80', status: 'pending', keepReason: '' },
+            { id: '3', name: '堆積的舊雜誌與特刊', category: '書房', notes: '資訊已過期，建議拿去紙類回收', imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80', status: 'pending', keepReason: '' },
+            { id: '4', name: '幾年前夾娃娃機夾到的玩偶', category: '客廳', notes: '放在沙發佔位置且容易積灰塵', imageUrl: 'https://images.unsplash.com/photo-1559454403-b8fb88521f11?auto=format&fit=crop&w=600&q=80', status: 'pending', keepReason: '' },
+            { id: '5', name: '塗層已經刮傷的平底鍋', category: '廚房', notes: '塗層受損有健康疑慮，建議更換新品', imageUrl: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80', status: 'pending', keepReason: '' },
+            { id: '6', name: '沒在用的備用充電線材', category: '陽台與雜物', notes: '舊款 Micro-USB 線，家裡已沒對應裝置', imageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=600&q=80', status: 'pending', keepReason: '' }
+        ];
+
+        let items = [];
+        let activeCategory = 'ALL';
+        let historyStack = [];
+        let currentResultTab = 'discard';
+        let customUploadedImage = null;
+        let pendingKeepItem = null;
+        let pendingKeepCardEl = null;
+
+        window.onload = function() {
+            loadItemsFromStorage();
+            renderCards();
+            updateStats();
+            document.getElementById('print-date').innerText = new Date().toLocaleDateString('zh-TW');
+            
+            if (DEFAULT_GOOGLE_SCRIPT_URL) {
+                document.getElementById('script-url-input').value = DEFAULT_GOOGLE_SCRIPT_URL;
+            } else {
+                document.getElementById('custom-url-field').classList.remove('hidden');
+            }
+        };
+
+        function loadItemsFromStorage() {
+            const saved = localStorage.getItem('declutter_items');
+            if (saved) {
+                try { items = JSON.parse(saved); } catch(e) { items = [...INITIAL_ITEMS]; }
+            } else { items = [...INITIAL_ITEMS]; }
+        }
+
+        function saveItemsToStorage() {
+            localStorage.setItem('declutter_items', JSON.stringify(items));
+        }
+
+        function filterCategory(category) {
+            activeCategory = category;
+            const buttons = document.querySelectorAll('.category-btn');
+            buttons.forEach(btn => {
+                if (btn.innerText.includes(category) || (category === 'ALL' && btn.innerText.includes('全部'))) {
+                    btn.classList.remove('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+                    btn.classList.add('bg-slate-800', 'text-white');
+                } else {
+                    btn.classList.remove('bg-slate-800', 'text-white');
+                    btn.classList.add('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+                }
+            });
+            renderCards();
+        }
+
+        function getFilteredPendingItems() {
+            return items.filter(item => (activeCategory === 'ALL' || item.category === activeCategory) && item.status === 'pending');
+        }
+
+        function renderCards() {
+            const container = document.getElementById('card-stack');
+            const pendingItems = getFilteredPendingItems();
+            const emptyState = document.getElementById('empty-state');
+
+            const existingCards = container.querySelectorAll('.swipe-card');
+            existingCards.forEach(c => c.remove());
+
+            if (pendingItems.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                const itemsToRender = pendingItems.slice(0, 3).reverse();
+                itemsToRender.forEach((item) => {
+                    const cardEl = createCardElement(item);
+                    container.appendChild(cardEl);
+                });
+                const topCard = container.querySelector('.swipe-card:last-child');
+                if (topCard) initSwipeEvents(topCard);
+            }
+
+            const totalForCat = items.filter(i => activeCategory === 'ALL' || i.category === activeCategory).length;
+            const doneForCat = items.filter(i => (activeCategory === 'ALL' || i.category === activeCategory) && i.status !== 'pending').length;
+            const percent = totalForCat > 0 ? Math.round((doneForCat / totalForCat) * 100) : 100;
+
+            document.getElementById('progress-text').innerText = `剩餘卡片: ${pendingItems.length} 張`;
+            document.getElementById('progress-percent').innerText = `${percent}% 完成`;
+            document.getElementById('progress-bar-fill').style.width = `${percent}%`;
+            document.getElementById('undo-btn').disabled = historyStack.length === 0;
+        }
+
+        function createCardElement(item) {
+            const card = document.createElement('div');
+            card.className = 'swipe-card flex flex-col justify-between';
+            card.dataset.id = item.id;
+            card.innerHTML = `
+                <div class="badge-stamp badge-keep">保留 KEEP</div>
+                <div class="badge-stamp badge-discard">丟棄 DISCARD</div>
+                <div class="badge-stamp badge-undecided">考慮中 UNDECIDED</div>
+                <div class="relative w-full h-3/4 bg-slate-200 overflow-hidden">
+                    <img src="${item.imageUrl}" class="w-full h-full object-cover pointer-events-none" onerror="this.src='https://placehold.co/600x600/e2e8f0/64748b?text=無圖片範例'">
+                    <div class="absolute top-3 left-3 bg-slate-900/60 backdrop-blur-md text-white text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-sm">
+                        ${getCategoryEmoji(item.category)} ${item.category}
+                    </div>
+                </div>
+                <div class="p-4 bg-white flex-1 flex flex-col justify-between">
+                    <div>
+                        <h2 class="font-bold text-slate-800 text-lg leading-snug line-clamp-1">${escapeHtml(item.name)}</h2>
+                        <p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHtml(item.notes || '無額外備註')}</p>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2 mt-2">
+                        <span><i class="fa-solid fa-arrows-up-left-right mr-1"></i>左保留、右丟棄、上考慮</span>
+                        <span>極簡整理助手</span>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        function getCategoryEmoji(cat) {
+            switch(cat) {
+                case '客廳': return '🛋️';
+                case '臥室': return '🛏️';
+                case '廚房': return '🍳';
+                case '書房': return '📚';
+                default: return '📦';
+            }
+        }
+
+        function initSwipeEvents(cardEl) {
+            let startX = 0, startY = 0, currentX = 0, currentY = 0, isDragging = false;
+            const badgeKeep = cardEl.querySelector('.badge-keep');
+            const badgeDiscard = cardEl.querySelector('.badge-discard');
+            const badgeUndecided = cardEl.querySelector('.badge-undecided');
+
+            const onStart = (e) => {
+                isDragging = true;
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                startX = clientX; startY = clientY;
+                cardEl.style.transition = 'none';
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                currentX = clientX - startX; currentY = clientY - startY;
+
+                const rotate = currentX * 0.08;
+                cardEl.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) rotate(${rotate}deg)`;
+
+                const threshold = 40;
+                if (currentY < -threshold && Math.abs(currentY) > Math.abs(currentX)) {
+                    badgeUndecided.style.opacity = Math.min(Math.abs(currentY) / threshold, 1);
+                    badgeKeep.style.opacity = 0; badgeDiscard.style.opacity = 0;
+                } else if (currentX < -threshold) {
+                    badgeKeep.style.opacity = Math.min(Math.abs(currentX) / threshold, 1);
+                    badgeDiscard.style.opacity = 0; badgeUndecided.style.opacity = 0;
+                } else if (currentX > threshold) {
+                    badgeDiscard.style.opacity = Math.min(currentX / threshold, 1);
+                    badgeKeep.style.opacity = 0; badgeUndecided.style.opacity = 0;
+                } else {
+                    badgeKeep.style.opacity = 0; badgeDiscard.style.opacity = 0; badgeUndecided.style.opacity = 0;
+                }
+            };
+
+            const onEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                cardEl.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+                const threshold = 90;
+
+                if (currentY < -threshold && Math.abs(currentY) > Math.abs(currentX)) {
+                    executeSwipe(cardEl, 'up');
+                } else if (currentX < -threshold) {
+                    executeSwipe(cardEl, 'left');
+                } else if (currentX > threshold) {
+                    executeSwipe(cardEl, 'right');
+                } else {
+                    cardEl.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+                    badgeKeep.style.opacity = 0; badgeDiscard.style.opacity = 0; badgeUndecided.style.opacity = 0;
+                }
+            };
+
+            cardEl.addEventListener('touchstart', onStart, { passive: true });
+            cardEl.addEventListener('touchmove', onMove, { passive: true });
+            cardEl.addEventListener('touchend', onEnd);
+            cardEl.addEventListener('mousedown', onStart);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onEnd);
+        }
+
+        function triggerSwipe(direction) {
+            const container = document.getElementById('card-stack');
+            const topCard = container.querySelector('.swipe-card:last-child');
+            if (topCard) executeSwipe(topCard, direction);
+        }
+
+        function executeSwipe(cardEl, direction) {
+            const itemId = cardEl.dataset.id;
+            const item = items.find(i => i.id === itemId);
+            if (!item) return;
+
+            if (direction === 'left') {
+                pendingKeepItem = item; pendingKeepCardEl = cardEl;
+                openKeepReasonModal();
+                return;
+            }
+
+            let moveX = 0, moveY = 0, rotate = 0, statusName = '';
+
+            if (direction === 'right') {
+                moveX = window.innerWidth; rotate = 25;
+                item.status = 'discard'; statusName = '已標記：丟棄此物品 🗑️';
+            } else if (direction === 'up') {
+                moveY = -window.innerHeight; rotate = 0;
+                item.status = 'undecided'; statusName = '已標記：沒意見 / 考慮中 🤔';
+            }
+
+            cardEl.style.transition = 'transform 0.4s ease-out, opacity 0.3s ease-out';
+            cardEl.style.transform = `translate3d(${moveX}px, ${moveY}px, 0) rotate(${rotate}deg)`;
+            cardEl.style.opacity = '0';
+
+            historyStack.push({ itemId: item.id, prevStatus: item.status });
+            saveItemsToStorage();
+
+            setTimeout(() => {
+                renderCards(); updateStats(); showToast(statusName);
+            }, 250);
+        }
+
+        function openKeepReasonModal() {
+            document.getElementById('keep-reason-input').value = '';
+            document.getElementById('keep-reason-modal').classList.remove('hidden');
+        }
+
+        function setQuickReason(text) {
+            document.getElementById('keep-reason-input').value = text;
+        }
+
+        function confirmKeepReason(event) {
+            event.preventDefault();
+            const reason = document.getElementById('keep-reason-input').value.trim();
+            if (!reason) { showToast('請務必填寫保留理由！'); return; }
+
+            if (pendingKeepItem && pendingKeepCardEl) {
+                pendingKeepItem.status = 'keep';
+                pendingKeepItem.keepReason = reason;
+
+                pendingKeepCardEl.style.transition = 'transform 0.4s ease-out, opacity 0.3s ease-out';
+                pendingKeepCardEl.style.transform = `translate3d(${-window.innerWidth}px, 0, 0) rotate(-25deg)`;
+                pendingKeepCardEl.style.opacity = '0';
+
+                historyStack.push({ itemId: pendingKeepItem.id, prevStatus: 'keep' });
+                saveItemsToStorage();
+
+                setTimeout(() => {
+                    renderCards(); updateStats(); showToast('理由已記錄，成功保留 💚');
+                    closeKeepReasonModal();
+                }, 250);
+            }
+        }
+
+        function forceDiscardFromModal() {
+            if (pendingKeepItem && pendingKeepCardEl) {
+                pendingKeepItem.status = 'discard';
+                pendingKeepItem.keepReason = '';
+
+                pendingKeepCardEl.style.transition = 'transform 0.4s ease-out, opacity 0.3s ease-out';
+                pendingKeepCardEl.style.transform = `translate3d(${window.innerWidth}px, 0, 0) rotate(25deg)`;
+                pendingKeepCardEl.style.opacity = '0';
+
+                historyStack.push({ itemId: pendingKeepItem.id, prevStatus: 'discard' });
+                saveItemsToStorage();
+
+                setTimeout(() => {
+                    renderCards(); updateStats(); showToast('無理由，改為丟棄此物品 🗑️');
+                    closeKeepReasonModal();
+                }, 250);
+            }
+        }
+
+        function closeKeepReasonModal() {
+            document.getElementById('keep-reason-modal').classList.add('hidden');
+            if (pendingKeepCardEl) pendingKeepCardEl.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+            pendingKeepItem = null; pendingKeepCardEl = null;
+        }
+
+        function undoLastSwipe() {
+            if (historyStack.length === 0) return;
+            const lastAction = historyStack.pop();
+            const item = items.find(i => i.id === lastAction.itemId);
+            if (item) {
+                item.status = 'pending';
+                saveItemsToStorage(); renderCards(); updateStats();
+                showToast('已復原上一次選擇 🔄');
+            }
+        }
+
+        function resetSwipes() {
+            items.forEach(i => i.status = 'pending');
+            historyStack = [];
+            saveItemsToStorage(); renderCards(); updateStats();
+            showToast('所有篩選已重新開始');
+        }
+
+        function updateStats() {
+            const total = items.length;
+            const keepCount = items.filter(i => i.status === 'keep').length;
+            const undecidedCount = items.filter(i => i.status === 'undecided').length;
+            const discardCount = items.filter(i => i.status === 'discard').length;
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-keep').innerText = keepCount;
+            document.getElementById('stat-undecided').innerText = undecidedCount;
+            document.getElementById('stat-discard').innerText = discardCount;
+
+            document.getElementById('badge-total-count').innerText = total;
+            document.getElementById('tab-count-discard').innerText = discardCount;
+            document.getElementById('tab-count-undecided').innerText = undecidedCount;
+            document.getElementById('tab-count-keep').innerText = keepCount;
+
+            renderResultList(); renderPrintList();
+        }
+
+        function switchResultTab(tab) {
+            currentResultTab = tab;
+            const btnDiscard = document.getElementById('tab-btn-discard');
+            const btnUndecided = document.getElementById('tab-btn-undecided');
+            const btnKeep = document.getElementById('tab-btn-keep');
+
+            [btnDiscard, btnUndecided, btnKeep].forEach(btn => {
+                btn.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-800 transition flex items-center justify-center space-x-1 font-semibold';
+            });
+
+            if (tab === 'discard') btnDiscard.className = 'flex-1 py-2 rounded-lg bg-white text-rose-600 shadow-sm transition flex items-center justify-center space-x-1 font-semibold';
+            else if (tab === 'undecided') btnUndecided.className = 'flex-1 py-2 rounded-lg bg-white text-amber-600 shadow-sm transition flex items-center justify-center space-x-1 font-semibold';
+            else btnKeep.className = 'flex-1 py-2 rounded-lg bg-white text-emerald-600 shadow-sm transition flex items-center justify-center space-x-1 font-semibold';
+
+            renderResultList();
+        }
+
+        function renderResultList() {
+            const container = document.getElementById('result-items-container');
+            const filteredItems = items.filter(i => i.status === currentResultTab);
+
+            if (filteredItems.length === 0) {
+                let statusLabel = currentResultTab === 'keep' ? '要保留' : (currentResultTab === 'undecided' ? '考慮中' : '要丟棄');
+                container.innerHTML = `<div class="text-center py-12 text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2"></i><p class="text-xs">目前沒有${statusLabel}的物品</p></div>`;
+                return;
+            }
+
+            container.innerHTML = filteredItems.map(item => `
+                <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3 overflow-hidden">
+                            <img src="${item.imageUrl}" class="w-12 h-12 rounded-xl object-cover flex-shrink-0 bg-slate-100" onerror="this.src='https://placehold.co/200x200/e2e8f0/64748b?text=無圖'">
+                            <div class="min-w-0">
+                                <h4 class="font-bold text-slate-800 text-sm truncate">${escapeHtml(item.name)}</h4>
+                                <p class="text-[11px] text-slate-400 truncate">${getCategoryEmoji(item.category)} ${item.category} ${item.notes ? '• ' + escapeHtml(item.notes) : ''}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 flex-shrink-0 ml-2">
+                            ${item.status !== 'keep' ? `<button onclick="changeItemStatus('${item.id}', 'keep')" class="text-[11px] px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition">保留</button>` : ''}
+                            ${item.status !== 'undecided' ? `<button onclick="changeItemStatus('${item.id}', 'undecided')" class="text-[11px] px-2 py-1 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition">考慮</button>` : ''}
+                            ${item.status !== 'discard' ? `<button onclick="changeItemStatus('${item.id}', 'discard')" class="text-[11px] px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition">丟棄</button>` : ''}
+                        </div>
+                    </div>
+                    ${item.status === 'keep' ? `<div class="bg-emerald-50/60 p-2 rounded-xl text-[11px] text-emerald-800 flex items-start space-x-1"><i class="fa-solid fa-quote-left text-emerald-400 mt-0.5"></i><span><strong>保留理由：</strong> ${escapeHtml(item.keepReason || '未填寫理由')}</span></div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function changeItemStatus(id, newStatus) {
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+
+            if (newStatus === 'keep') {
+                const reason = prompt('請輸入保留理由：');
+                if (!reason || !reason.trim()) { alert('需要填寫保留理由才能進行保留喔！'); return; }
+                item.keepReason = reason.trim();
+            }
+
+            item.status = newStatus;
+            saveItemsToStorage(); updateStats();
+            showToast('已更新物品處置狀態');
+        }
+
+        function renderPrintList() {
+            const discardTbody = document.getElementById('print-discard-tbody');
+            const undecidedTbody = document.getElementById('print-undecided-tbody');
+            const keepTbody = document.getElementById('print-keep-tbody');
+
+            const discardItems = items.filter(i => i.status === 'discard');
+            const undecidedItems = items.filter(i => i.status === 'undecided');
+            const keepItems = items.filter(i => i.status === 'keep');
+
+            discardTbody.innerHTML = discardItems.length === 0 ? '<tr><td colspan="4" class="p-2 text-center text-slate-400 text-xs">無丟棄項目</td></tr>' : discardItems.map(i => `<tr class="border-b"><td class="p-2 font-medium">${escapeHtml(i.name)}</td><td class="p-2">${i.category}</td><td class="p-2 text-slate-500">${escapeHtml(i.notes || '-')}</td><td class="p-2 text-center"><input type="checkbox"></td></tr>`).join('');
+            undecidedTbody.innerHTML = undecidedItems.length === 0 ? '<tr><td colspan="3" class="p-2 text-center text-slate-400 text-xs">無考慮中項目</td></tr>' : undecidedItems.map(i => `<tr class="border-b"><td class="p-2 font-medium">${escapeHtml(i.name)}</td><td class="p-2">${i.category}</td><td class="p-2 text-slate-500">${escapeHtml(i.notes || '-')}</td></tr>`).join('');
+            keepTbody.innerHTML = keepItems.length === 0 ? '<tr><td colspan="3" class="p-2 text-center text-slate-400 text-xs">無保留項目</td></tr>' : keepItems.map(i => `<tr class="border-b"><td class="p-2 font-medium">${escapeHtml(i.name)}</td><td class="p-2">${i.category}</td><td class="p-2 text-slate-500">${escapeHtml(i.keepReason || '未填寫理由')}</td></tr>`).join('');
+        }
+
+        function uploadToGoogleSheets() {
+            const userName = document.getElementById('user-name-input').value.trim();
+            const scriptUrl = document.getElementById('script-url-input').value.trim() || DEFAULT_GOOGLE_SCRIPT_URL;
+
+            if (!userName) { alert('請填寫您的稱呼/姓名！'); return; }
+            if (!scriptUrl) { alert('尚未設定 Google Web App 網址！'); return; }
+
+            const decidedItems = items.filter(i => i.status !== 'pending').map(i => ({
+                title: i.name,
+                category: i.category,
+                status: i.status,
+                reason: i.status === 'keep' ? i.keepReason : i.notes
+            }));
+
+            if (decidedItems.length === 0) { alert('您目前尚未對任何物品做選擇喔！'); return; }
+
+            const btn = document.getElementById('upload-btn');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>上傳中...</span>`;
+
+            fetch(scriptUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName: userName, items: decidedItems })
+            })
+            .then(() => {
+                showToast('成果已成功上傳至雲端試算表！ 🎉');
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-circle-check"></i><span>上傳成功！</span>`;
+                setTimeout(() => {
+                    btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i><span>送出我的成果至 Google 試算表</span>`;
+                }, 3000);
+            })
+            .catch(err => {
+                alert('上傳失敗：' + err.message);
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i><span>重試上傳</span>`;
+            });
+        }
+
+        function openAddModal() { document.getElementById('add-modal').classList.remove('hidden'); }
+        function closeAddModal() {
+            document.getElementById('add-modal').classList.add('hidden');
+            document.getElementById('add-item-form').reset();
+            document.getElementById('image-preview').classList.add('hidden');
+            document.getElementById('upload-placeholder').classList.remove('hidden');
+            customUploadedImage = null;
+        }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    customUploadedImage = e.target.result;
+                    const preview = document.getElementById('image-preview');
+                    preview.src = customUploadedImage;
+                    preview.classList.remove('hidden');
+                    document.getElementById('upload-placeholder').classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleAddItem(event) {
+            event.preventDefault();
+            const name = document.getElementById('item-name').value.trim();
+            const category = document.getElementById('item-category').value;
+            const notes = document.getElementById('item-notes').value.trim();
+            if (!name) return;
+
+            const newItem = {
+                id: Date.now().toString(),
+                name: name,
+                category: category,
+                notes: notes,
+                imageUrl: customUploadedImage || 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=600&q=80',
+                status: 'pending',
+                keepReason: ''
+            };
+
+            items.unshift(newItem);
+            saveItemsToStorage(); closeAddModal(); renderCards(); updateStats();
+            showToast('已新增物品至卡片盒 📦');
+        }
+
+        function switchView(viewName) {
+            const swipeView = document.getElementById('swipe-view');
+            const summaryView = document.getElementById('summary-view');
+            if (viewName === 'summary') {
+                swipeView.classList.add('hidden');
+                summaryView.classList.remove('hidden'); summaryView.classList.add('flex');
+            } else {
+                summaryView.classList.add('hidden'); summaryView.classList.remove('flex');
+                swipeView.classList.remove('hidden');
+            }
+        }
+
+        function copySummaryText() {
+            const discardItems = items.filter(i => i.status === 'discard');
+            const undecidedItems = items.filter(i => i.status === 'undecided');
+            const keepItems = items.filter(i => i.status === 'keep');
+
+            let text = `【家庭斷捨離大作戰 - 整理成果】\n日期: ${new Date().toLocaleDateString('zh-TW')}\n\n`;
+            text += `🗑 【決定丟棄】 (${discardItems.length} 項):\n`;
+            discardItems.forEach((item, index) => { text += `${index + 1}. [${item.category}] ${item.name} ${item.notes ? '(' + item.notes + ')' : ''}\n`; });
+
+            text += `\n🤔 【沒意見/考慮中】 (${undecidedItems.length} 項):\n`;
+            undecidedItems.forEach((item, index) => { text += `${index + 1}. [${item.category}] ${item.name} ${item.notes ? '(' + item.notes + ')' : ''}\n`; });
+
+            text += `\n📦 【決定保留】 (${keepItems.length} 項):\n`;
+            keepItems.forEach((item, index) => { text += `${index + 1}. [${item.category}] ${item.name} (理由: ${item.keepReason || '無'})\n`; });
+
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            showToast('清單已成功複製至剪貼簿 📋');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('opacity-0', 'translate-y-10');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-10');
+            }, 2000);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
