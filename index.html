@@ -16,7 +16,7 @@
         // ⚙️ 管理員設定：請將您的 Google Web App 網址貼在下面的雙引號內
         // 例如: "https://script.google.com/macros/s/AKfycbxxxxx/exec"
         // =========================================================================
-        const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqcznvSWMSlS_76qQSCJ3Xz4e6sOBqtEUwBZ9tC6xD_TbBzKunfmiDiH130lslRInp/exec";
+        const DEFAULT_GOOGLE_SCRIPT_URL = "";
     </script>
 
     <style>
@@ -130,15 +130,9 @@
         }
 
         @media print {
-            body {
-                background: white;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .print-only {
-                display: block !important;
-            }
+            body { background: white; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
         }
     </style>
 </head>
@@ -399,7 +393,7 @@
                     <input type="text" id="item-notes" placeholder="例如：拿去回收、問家人要不要" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
                 </div>
 
-                <button type="submit" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-xl text-sm shadow-md transition transform active:scale-98 mt-2">
+                <button type="submit" id="submit-add-btn" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-xl text-sm shadow-md transition transform active:scale-98 mt-2">
                     加入斷捨離卡片盒
                 </button>
             </form>
@@ -502,7 +496,11 @@
         }
 
         function saveItemsToStorage() {
-            localStorage.setItem('declutter_items', JSON.stringify(items));
+            try {
+                localStorage.setItem('declutter_items', JSON.stringify(items));
+            } catch (e) {
+                alert('⚠️ 手機暫存空間已滿！已為您保留最關鍵數據。建議清空舊項目後重試。');
+            }
         }
 
         function filterCategory(category) {
@@ -585,7 +583,7 @@
 
         function getCategoryEmoji(cat) {
             switch(cat) {
-                case '客廳': return '🛋️';
+                case '客廳': return '🛋️️';
                 case '臥室': return '🛏️';
                 case '廚房': return '🍳';
                 case '書房': return '📚';
@@ -917,19 +915,44 @@
             customUploadedImage = null;
         }
 
+        // Auto-Compress High-Res Mobile Photos to prevent browser crash
         function previewImage(event) {
             const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    customUploadedImage = e.target.result;
+            if (!file) return;
+
+            showToast('圖片處理中...');
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 600;
+                    const MAX_HEIGHT = 600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    } else {
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Compress to lightweight JPEG
+                    customUploadedImage = canvas.toDataURL('image/jpeg', 0.65);
+
                     const preview = document.getElementById('image-preview');
                     preview.src = customUploadedImage;
                     preview.classList.remove('hidden');
                     document.getElementById('upload-placeholder').classList.add('hidden');
                 };
-                reader.readAsDataURL(file);
-            }
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         function handleAddItem(event) {
@@ -939,19 +962,31 @@
             const notes = document.getElementById('item-notes').value.trim();
             if (!name) return;
 
-            const newItem = {
-                id: Date.now().toString(),
-                name: name,
-                category: category,
-                notes: notes,
-                imageUrl: customUploadedImage || 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=600&q=80',
-                status: 'pending',
-                keepReason: ''
-            };
+            const submitBtn = document.getElementById('submit-add-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerText = '處理中...';
 
-            items.unshift(newItem);
-            saveItemsToStorage(); closeAddModal(); renderCards(); updateStats();
-            showToast('已新增物品至卡片盒 📦');
+            setTimeout(() => {
+                const newItem = {
+                    id: Date.now().toString(),
+                    name: name,
+                    category: category,
+                    notes: notes,
+                    imageUrl: customUploadedImage || 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=600&q=80',
+                    status: 'pending',
+                    keepReason: ''
+                };
+
+                items.unshift(newItem);
+                saveItemsToStorage(); 
+                closeAddModal(); 
+                renderCards(); 
+                updateStats();
+                showToast('已成功新增物品 📦');
+
+                submitBtn.disabled = false;
+                submitBtn.innerText = '加入斷捨離卡片盒';
+            }, 100);
         }
 
         function switchView(viewName) {
